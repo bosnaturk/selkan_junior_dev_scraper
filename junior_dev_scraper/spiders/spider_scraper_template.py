@@ -5,21 +5,37 @@ class Car24ComSpider(scrapy.Spider):
     name = 'mycrawler'
     allowed_domains = ['cars24.com']
     start_urls = ['https://www.cars24.com/ae/buy-used-cars-dubai/']
-    base_xhr_url = 'https://listing-service.c24.tech/v2/vehicle?sf=city:DU&sf=gaId:&size=25&spath=buy-used-cars-dubai&page={}&variant=filterV5'
-    page_number = 1  # Start with page 1
 
-    def parse(self, response):        
+    def parse(self, response):
+        # Print the URL of the current page
+        print("URL:", response.url)
+        
         # Loop through each car ad on the page
         for ad in response.css('._3IIl_._1xLfH'):
-            # ... [Your scraping logic remains unchanged] ...
+            # Extract the brand and other data
+            brand = ad.css('._3TSwN>.RZ4T7::text').get()
+            engine_size = ad.css("ul._3ZoHn>li::text")[2].get()
+            
+            # Extract the text from the p element and use a regular expression to get the year
+            year_text = ad.css('._1i1E6::text').get()
+            year = re.search(r'\b\d{4}\b', year_text).group() if year_text else None
+            
+            deeplink = ad.css('._1Lu5u::attr(href)').get()
+            price = ad.css('._7yds2::text').get()
+            mileage = ad.css("ul._3ZoHn>li::text")[1].get()
+
+            # Create a new dictionary for the scraped data
+            car_data = {
+                'Brand': brand,
+                'Engine Size': engine_size,
+                'Year of Manufacture': year,
+                'Deeplink': response.urljoin(deeplink),
+                'Price': price,
+                'Mileage': mileage,
+            }
 
             # Pass the car_data dictionary to the parse_details method
             yield scrapy.Request(url=response.urljoin(deeplink), callback=self.parse_details, meta=car_data)
-
-        # Pagination: Increment the page number and send a request to the next page's URL
-        self.page_number += 1
-        next_page_url = self.base_xhr_url.format(self.page_number)
-        yield scrapy.Request(url=next_page_url, callback=self.parse)
 
     def parse_details(self, response):
         # Retrieve the data passed from the previous method
@@ -38,3 +54,4 @@ class Car24ComSpider(scrapy.Spider):
         # Add the Fuel Type to the item and yield it
         item['Fuel Type'] = fuel_type
         yield item
+
